@@ -68,7 +68,7 @@
       setTot(card.querySelector('.tot[data-g="rep"]'), r);
       gn += n; gr += r;
     });
-    grand.textContent = 'NEW PVC TOTAL: ' + gn + '\nREPRINTED PVC TOTAL: ' + gr;
+    grand.textContent = 'NEW PVC TOTAL: ' + gn + '\nTRANSFER PVC PVC TOTAL: ' + gr;
   }
   list.addEventListener('input', recalc);
 
@@ -131,7 +131,7 @@
       card.appendChild(pu);
       card.appendChild(group('NEW PVC', u.received - u.collected, 'male', 'female', 'new'));
       card.appendChild(el('div', 'sep'));
-      card.appendChild(group('REPRINTED PVC', u.rReceived - u.rCollected, 'rmale', 'rfemale', 'rep'));
+      card.appendChild(group('TRANSFER PVC PVC', u.rReceived - u.rCollected, 'rmale', 'rfemale', 'rep'));
       list.appendChild(card);
     });
     grand.style.display = units.length ? 'block' : 'none';
@@ -195,7 +195,7 @@
         btn.disabled = false;
         render([]);
         show('✔ SUBMITTED – ' + raName + ': ' + res.saved + ' polling unit' + (res.saved === 1 ? '' : 's') +
-             ', ' + total + ' new PVCs, ' + rtotal + ' reprinted PVCs collected. (' + new Date().toLocaleString() + ')', true);
+             ', ' + total + ' new PVCs, ' + rtotal + ' TRANSFER PVC PVCs collected. (' + new Date().toLocaleString() + ')', true);
         window.scrollTo(0, 0);
       })
       .withFailureHandler(function (e) { btn.disabled = false; show('NOT SUBMITTED – ' + e.message, false); window.scrollTo(0, 0); })
