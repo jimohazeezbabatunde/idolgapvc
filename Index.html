@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: Arial, sans-serif; margin: 0; padding: 12px; background: #f4f6f4; color: #1b1b1b; }
+  h1 { font-size: 18px; margin: 0 0 12px; color: #0b6b3a; }
+  label { display: block; font-size: 13px; font-weight: bold; margin: 10px 0 4px; }
+  select, input[type=text], input[type=number] { width: 100%; box-sizing: border-box; padding: 10px; font-size: 16px; border: 1px solid #999; border-radius: 6px; background: #fff; }
+  button { width: 100%; margin-top: 14px; padding: 14px; font-size: 16px; font-weight: bold; color: #fff; background: #0b6b3a; border: 0; border-radius: 8px; }
+  button:disabled { background: #8aa; }
+  #msg { margin: 0 0 12px; padding: 10px; border-radius: 6px; display: none; font-size: 14px; }
+  .ok { background: #d9ead3; font-weight: bold; font-size: 16px; } .err { background: #f4cccc; }
+  .card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px; margin-top: 10px; }
+  .card .pu { font-size: 13px; }
+  .left { font-size: 12px; color: #555; margin: 0 0 4px; }
+  .grp { font-size: 12px; font-weight: bold; margin: 8px 0 2px; color: #0b6b3a; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grid label { font-size: 12px; font-weight: normal; margin: 0 0 2px; }
+  .grid input { text-align: center; }
+  .tot { font-size: 13px; margin: 6px 0 4px; text-align: right; font-weight: bold; }
+  .sep { border-top: 1px solid #ddd; margin-top: 10px; }
+  #grand { display: none; margin-top: 12px; padding: 10px; background: #d9ead3; border-radius: 6px; font-weight: bold; font-size: 15px; text-align: right; white-space: pre-line; }
+</style>
+</head>
+<body>
+<h2>IDO LGA PVC COLLECTION</h2>
+<div id="msg"></div>
+
+<label for="officer">Officer full name <span style="color:#c00">* required</span></label>
+<input type="text" id="officer" placeholder="Your name">
+
+<label for="ra">Registration Area (RA)</label>
+<select id="ra"><option value="">Loading…</option></select>
+
+<div id="list"></div>
+
+<div id="grand"></div>
+<button id="submit" style="display:none">Submit</button>
+
+<script>
+  const raSel = document.getElementById('ra');
+  const list = document.getElementById('list');
+  const btn = document.getElementById('submit');
+  const msg = document.getElementById('msg');
+  const grand = document.getElementById('grand');
+  const KEYS = ['male', 'female', 'rmale', 'rfemale'];
+
+  function val(i) { return i.value === '' ? 0 : Number(i.value); }
+
+  function setTot(t, n) {
+    const rem = Number(t.dataset.left) - n;
+    t.querySelector('.t').textContent = n;
+    const r = t.querySelector('.r');
+    r.textContent = rem;
+    r.style.color = rem < 0 ? '#c00' : '';
+  }
+
+  function recalc() {
+    let gn = 0, gr = 0;
+    list.querySelectorAll('.card').forEach(function (card) {
+      const v = {};
+      KEYS.forEach(function (k) { v[k] = val(card.querySelector('input[data-k="' + k + '"]')); });
+      const n = (v.male || 0) + (v.female || 0);
+      const r = (v.rmale || 0) + (v.rfemale || 0);
+      setTot(card.querySelector('.tot[data-g="new"]'), n);
+      setTot(card.querySelector('.tot[data-g="rep"]'), r);
+      gn += n; gr += r;
+    });
+    grand.textContent = 'NEW PVC TOTAL: ' + gn + '\nREPRINTED PVC TOTAL: ' + gr;
+  }
+  list.addEventListener('input', recalc);
+
+  function show(text, ok) {
+    msg.textContent = text;
+    msg.className = ok ? 'ok' : 'err';
+    msg.style.display = 'block';
+  }
+
+  google.script.run.withSuccessHandler(function (ras) {
+    raSel.innerHTML = '<option value="">Select RA…</option>';
+    ras.forEach(function (r) {
+      const o = document.createElement('option');
+      o.value = r.ward;
+      o.textContent = 'RA ' + r.ward + ' – ' + r.name;
+      raSel.appendChild(o);
+    });
+  }).getRAs();
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function group(title, left, kMale, kFemale, g) {
+    const frag = document.createDocumentFragment();
+    frag.appendChild(el('div', 'grp', title));
+    frag.appendChild(el('div', 'left', 'Left: ' + left));
+    const grid = el('div', 'grid');
+    [[kMale, 'Male'], [kFemale, 'Female']].forEach(function (p) {
+      const cell = el('div');
+      cell.appendChild(el('label', '', p[1]));
+      const i = document.createElement('input');
+      i.type = 'number'; i.min = '0'; i.step = '1'; i.inputMode = 'numeric'; i.dataset.k = p[0];
+      cell.appendChild(i);
+      grid.appendChild(cell);
+    });
+    frag.appendChild(grid);
+    const tot = el('div', 'tot');
+    tot.dataset.g = g; tot.dataset.left = left;
+    tot.appendChild(document.createTextNode('Total collected: '));
+    tot.appendChild(el('span', 't', '0'));
+    tot.appendChild(document.createTextNode('   |   Remaining: '));
+    tot.appendChild(el('span', 'r', String(left)));
+    frag.appendChild(tot);
+    return frag;
+  }
+
+  function render(units) {
+    list.innerHTML = '';
+    units.forEach(function (u) {
+      const card = el('div', 'card');
+      card.dataset.code = u.code;
+      const pu = el('div', 'pu');
+      pu.appendChild(el('strong', '', u.code));
+      pu.appendChild(document.createElement('br'));
+      pu.appendChild(document.createTextNode(u.name));
+      card.appendChild(pu);
+      card.appendChild(group('NEW PVC', u.received - u.collected, 'male', 'female', 'new'));
+      card.appendChild(el('div', 'sep'));
+      card.appendChild(group('REPRINTED PVC', u.rReceived - u.rCollected, 'rmale', 'rfemale', 'rep'));
+      list.appendChild(card);
+    });
+    grand.style.display = units.length ? 'block' : 'none';
+    recalc();
+    btn.style.display = units.length ? '' : 'none';
+  }
+
+  raSel.addEventListener('change', function () {
+    msg.style.display = 'none';
+    render([]);
+    if (!raSel.value) return;
+    google.script.run
+      .withSuccessHandler(function (st) {
+        if (st.submitted) {
+          show('RA ' + raSel.value + ' was already submitted today by ' + st.by + '. It cannot be submitted again. Contact your supervisor.', false);
+        } else {
+          google.script.run.withSuccessHandler(render)
+            .withFailureHandler(function (e) { show(e.message, false); })
+            .getPollingUnits(raSel.value);
+        }
+      })
+      .withFailureHandler(function (e) { show(e.message, false); })
+      .wardSubmittedToday(raSel.value);
+  });
+
+  btn.addEventListener('click', function () {
+    const officerName = document.getElementById('officer').value.trim();
+    if (officerName.length < 3) {
+      show('NOT SUBMITTED – Enter your full name first.', false);
+      document.getElementById('officer').focus();
+      window.scrollTo(0, 0);
+      return;
+    }
+    const entries = [];
+    let bad = '';
+    list.querySelectorAll('.card').forEach(function (card) {
+      const v = {};
+      KEYS.forEach(function (k) { v[k] = val(card.querySelector('input[data-k="' + k + '"]')); });
+      const ok = KEYS.every(function (k) { return Number.isInteger(v[k]) && v[k] >= 0; });
+      if (!ok) { bad = card.dataset.code; return; }
+      if (v.male + v.female + v.rmale + v.rfemale > 0) {
+        entries.push({ code: card.dataset.code, male: v.male, female: v.female, rmale: v.rmale, rfemale: v.rfemale });
+      }
+    });
+    if (bad) {
+      show('NOT SUBMITTED – Check the figures for ' + bad + '. Use whole numbers only.', false);
+      window.scrollTo(0, 0);
+      return;
+    }
+    if (!entries.length) {
+      show('NOT SUBMITTED – Enter at least one figure.', false);
+      window.scrollTo(0, 0);
+      return;
+    }
+    const total = entries.reduce(function (t, e) { return t + e.male + e.female; }, 0);
+    const rtotal = entries.reduce(function (t, e) { return t + e.rmale + e.rfemale; }, 0);
+    const raName = raSel.options[raSel.selectedIndex].textContent;
+    btn.disabled = true;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        btn.disabled = false;
+        render([]);
+        show('✔ SUBMITTED – ' + raName + ': ' + res.saved + ' polling unit' + (res.saved === 1 ? '' : 's') +
+             ', ' + total + ' new PVCs, ' + rtotal + ' reprinted PVCs collected. (' + new Date().toLocaleString() + ')', true);
+        window.scrollTo(0, 0);
+      })
+      .withFailureHandler(function (e) { btn.disabled = false; show('NOT SUBMITTED – ' + e.message, false); window.scrollTo(0, 0); })
+      .submitEntries(raSel.value, officerName, entries);
+  });
+</script>
+</body>
+</html>
